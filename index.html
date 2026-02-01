@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bummer Currency</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Landing View -->
+        <div id="landing-view" class="view">
+            <div class="container">
+                <h1>Bummer Currency</h1>
+                <p class="subtitle">Fair distribution of unpleasant tasks</p>
+
+                <div class="card">
+                    <h2>Create New Group</h2>
+                    <form id="create-group-form">
+                        <div class="form-group">
+                            <label for="group-name">Group Name</label>
+                            <input type="text" id="group-name" placeholder="e.g., Our House" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="admin-pin">Admin PIN (4 digits)</label>
+                            <input type="password" id="admin-pin" pattern="[0-9]{4}" maxlength="4" placeholder="1234" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Create Group</button>
+                    </form>
+                </div>
+
+                <div class="divider">or</div>
+
+                <div class="card">
+                    <h2>Join Existing Group</h2>
+                    <form id="join-group-form">
+                        <div class="form-group">
+                            <label for="group-code">Group Code</label>
+                            <input type="text" id="group-code" placeholder="e.g., HOUSE-7K3M" required>
+                        </div>
+                        <button type="submit" class="btn btn-secondary">Join Group</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard View -->
+        <div id="dashboard-view" class="view hidden">
+            <header class="header">
+                <h1 id="group-title">Group Name</h1>
+                <div class="header-actions">
+                    <button id="admin-btn" class="btn btn-small">Admin</button>
+                    <button id="leave-btn" class="btn btn-small btn-danger">Leave</button>
+                </div>
+            </header>
+
+            <div class="container">
+                <!-- Member Selection -->
+                <div class="card member-select-card">
+                    <label for="current-member">Acting as:</label>
+                    <select id="current-member">
+                        <option value="">Select yourself...</option>
+                    </select>
+                </div>
+
+                <!-- Leaderboard -->
+                <div class="card">
+                    <h2>Leaderboard</h2>
+                    <div id="leaderboard" class="leaderboard">
+                        <p class="empty-state">No members yet</p>
+                    </div>
+                </div>
+
+                <!-- Upcoming Tasks -->
+                <div class="card">
+                    <h2>Upcoming Tasks</h2>
+                    <div id="tasks-list" class="tasks-list">
+                        <p class="empty-state">No upcoming tasks</p>
+                    </div>
+                </div>
+
+                <!-- History -->
+                <details class="card history-card">
+                    <summary><h2>Recent Activity</h2></summary>
+                    <div id="history-list" class="history-list">
+                        <p class="empty-state">No activity yet</p>
+                    </div>
+                </details>
+            </div>
+        </div>
+
+        <!-- Admin Panel -->
+        <div id="admin-view" class="view hidden">
+            <header class="header">
+                <button id="admin-back-btn" class="btn btn-small">&larr; Back</button>
+                <h1>Admin Panel</h1>
+            </header>
+
+            <div class="container">
+                <!-- Admin Tabs -->
+                <div class="tabs">
+                    <button class="tab active" data-tab="members-tab">Members</button>
+                    <button class="tab" data-tab="tasks-tab">Tasks</button>
+                    <button class="tab" data-tab="group-tab">Group</button>
+                </div>
+
+                <!-- Members Tab -->
+                <div id="members-tab" class="tab-content active">
+                    <div class="card">
+                        <h3>Add Member</h3>
+                        <form id="add-member-form">
+                            <div class="form-row">
+                                <input type="text" id="new-member-name" placeholder="Member name" required>
+                                <button type="submit" class="btn btn-primary">Add</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="card">
+                        <h3>Manage Members</h3>
+                        <div id="admin-members-list" class="admin-list">
+                            <p class="empty-state">No members</p>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h3>Adjust Points</h3>
+                        <form id="adjust-points-form">
+                            <div class="form-group">
+                                <label for="adjust-member">Member</label>
+                                <select id="adjust-member" required>
+                                    <option value="">Select member...</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="adjust-amount">Points (+/-)</label>
+                                <input type="number" id="adjust-amount" placeholder="e.g., 10 or -5" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="adjust-note">Note (optional)</label>
+                                <input type="text" id="adjust-note" placeholder="Reason for adjustment">
+                            </div>
+                            <button type="submit" class="btn btn-primary">Adjust Points</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Tasks Tab -->
+                <div id="tasks-tab" class="tab-content">
+                    <div class="card">
+                        <h3>Create Task</h3>
+                        <form id="create-task-form">
+                            <div class="form-group">
+                                <label for="task-name">Task Name</label>
+                                <input type="text" id="task-name" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="task-description">Description (optional)</label>
+                                <textarea id="task-description" rows="2"></textarea>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="task-points">Points</label>
+                                    <input type="number" id="task-points" min="1" value="10" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="task-due-date">Due Date</label>
+                                    <input type="date" id="task-due-date" required>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="task-recurring">
+                                    Recurring task
+                                </label>
+                            </div>
+                            <div class="form-group" id="frequency-group" style="display: none;">
+                                <label for="task-frequency">Frequency</label>
+                                <select id="task-frequency">
+                                    <option value="daily">Daily</option>
+                                    <option value="weekly">Weekly</option>
+                                    <option value="biweekly">Biweekly</option>
+                                    <option value="monthly">Monthly</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Create Task</button>
+                        </form>
+                    </div>
+
+                    <div class="card">
+                        <h3>Manage Tasks</h3>
+                        <div id="admin-tasks-list" class="admin-list">
+                            <p class="empty-state">No tasks</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Group Tab -->
+                <div id="group-tab" class="tab-content">
+                    <div class="card">
+                        <h3>Group Code</h3>
+                        <p>Share this code with others to let them join:</p>
+                        <div class="code-display">
+                            <span id="display-group-code">XXXX-XXXX</span>
+                            <button id="copy-code-btn" class="btn btn-small">Copy</button>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h3>Rename Group</h3>
+                        <form id="rename-group-form">
+                            <div class="form-row">
+                                <input type="text" id="new-group-name" placeholder="New group name" required>
+                                <button type="submit" class="btn btn-primary">Rename</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PIN Modal -->
+        <div id="pin-modal" class="modal hidden">
+            <div class="modal-content">
+                <h2>Enter Admin PIN</h2>
+                <form id="pin-form">
+                    <input type="password" id="pin-input" pattern="[0-9]{4}" maxlength="4" placeholder="4-digit PIN" required>
+                    <div class="modal-actions">
+                        <button type="button" id="pin-cancel" class="btn btn-secondary">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Submit</button>
+                    </div>
+                </form>
+                <p id="pin-error" class="error hidden">Incorrect PIN</p>
+            </div>
+        </div>
+
+        <!-- Edit Task Modal -->
+        <div id="edit-task-modal" class="modal hidden">
+            <div class="modal-content">
+                <h2>Edit Task</h2>
+                <form id="edit-task-form">
+                    <input type="hidden" id="edit-task-id">
+                    <div class="form-group">
+                        <label for="edit-task-name">Task Name</label>
+                        <input type="text" id="edit-task-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-task-description">Description</label>
+                        <textarea id="edit-task-description" rows="2"></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-task-points">Points</label>
+                            <input type="number" id="edit-task-points" min="1" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-task-due-date">Due Date</label>
+                            <input type="date" id="edit-task-due-date" required>
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" id="edit-task-cancel" class="btn btn-secondary">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+    <!-- App Scripts -->
+    <script src="js/firebase-config.js"></script>
+    <script src="js/members.js"></script>
+    <script src="js/tasks.js"></script>
+    <script src="js/history.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
