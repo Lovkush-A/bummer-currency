@@ -84,10 +84,20 @@ const Tasks = {
         return true;
     },
 
-    // Claim a task
-    async claim(taskId, memberId) {
+    // Claim a task (or claim from someone with more points)
+    async claim(taskId, memberId, claimFromMemberId = null) {
         const task = await this.get(taskId);
-        if (!task || task.status !== 'available') {
+        if (!task) {
+            return { success: false, error: 'Task not found' };
+        }
+
+        // If task is already claimed by someone else, verify the claimer can take it
+        if (task.status === 'claimed' && task.claimedBy !== memberId) {
+            if (!claimFromMemberId || task.claimedBy !== claimFromMemberId) {
+                return { success: false, error: 'Task is already claimed' };
+            }
+            // claimFromMemberId matches - this is a competitive claim, verified by caller
+        } else if (task.status !== 'available' && task.status !== 'claimed') {
             return { success: false, error: 'Task is no longer available' };
         }
 
@@ -95,14 +105,6 @@ const Tasks = {
         if (!member) {
             return { success: false, error: 'Member not found' };
         }
-
-        // Check for conflicting claims (lowest points wins)
-        // In a real app, you'd use a transaction here
-        const members = await Members.getAll(task.groupId);
-        const claimingMember = members.find(m => m.id === memberId);
-
-        // For simplicity, we just proceed with the claim
-        // A more robust implementation would use Firestore transactions
 
         await db.collection('tasks').doc(taskId).update({
             status: 'claimed',
@@ -240,13 +242,15 @@ const Tasks = {
     },
 
     // Render a single task item
-    renderTaskItem(task, memberMap, currentMemberId, isOverdue) {
+    renderTaskItem(task, memberMap, memberPointsMap, currentMemberId, isOverdue) {
         const dueDate = task.dueDate ? task.dueDate.toDate() : null;
         const dueDateStr = dueDate ? this.formatDate(dueDate) : 'No due date';
 
         let statusClass = isOverdue ? 'overdue' : '';
         let actions = '';
         let claimedInfo = '';
+
+        const currentMemberPoints = currentMemberId ? (memberPointsMap[currentMemberId] || 0) : 0;
 
         if (task.status === 'available') {
             if (currentMemberId) {
@@ -255,10 +259,19 @@ const Tasks = {
         } else if (task.status === 'claimed') {
             statusClass += (statusClass ? ' ' : '') + 'claimed';
             const claimerName = memberMap[task.claimedBy] || 'Unknown';
-            claimedInfo = `<span class="task-claimed-by">Claimed by ${this.escapeHtml(claimerName)}</span>`;
+            const claimerPoints = memberPointsMap[task.claimedBy] || 0;
 
             if (task.claimedBy === currentMemberId) {
+                // You claimed it - show Complete button
+                claimedInfo = `<span class="task-claimed-by">Claimed by you</span>`;
                 actions = `<button class="btn btn-primary btn-small" onclick="App.completeTask('${task.id}')">Complete</button>`;
+            } else if (currentMemberId && currentMemberPoints < claimerPoints) {
+                // You have fewer points - can claim from them
+                claimedInfo = `<span class="task-claimed-by task-can-claim">You have fewer points than ${this.escapeHtml(claimerName)}</span>`;
+                actions = `<button class="btn btn-secondary btn-small" onclick="App.claimFromTask('${task.id}', '${task.claimedBy}', '${this.escapeHtml(claimerName).replace(/'/g, "\\'")}')">Claim from ${this.escapeHtml(claimerName)}</button>`;
+            } else {
+                // They have fewer or equal points - cannot claim
+                claimedInfo = `<span class="task-claimed-by">Claimed by ${this.escapeHtml(claimerName)} (fewer points)</span>`;
             }
         }
 
@@ -290,9 +303,13 @@ const Tasks = {
             return;
         }
 
-        // Build member lookup
+        // Build member lookups (name and points)
         const memberMap = {};
-        members.forEach(m => memberMap[m.id] = m.name);
+        const memberPointsMap = {};
+        members.forEach(m => {
+            memberMap[m.id] = m.name;
+            memberPointsMap[m.id] = m.points || 0;
+        });
 
         // Group tasks by due date
         const groups = this.groupTasksByDueDate(tasks);
@@ -316,7 +333,7 @@ const Tasks = {
             html += `<div class="${sectionClass}">`;
             html += `<div class="task-section-header">${section.label}</div>`;
             html += sectionTasks.map(task =>
-                this.renderTaskItem(task, memberMap, currentMemberId, section.isOverdue)
+                this.renderTaskItem(task, memberMap, memberPointsMap, currentMemberId, section.isOverdue)
             ).join('');
             html += '</div>';
         });

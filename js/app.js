@@ -337,13 +337,23 @@ const App = {
         document.getElementById('edit-task-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const taskId = document.getElementById('edit-task-id').value;
+            const claimedBy = document.getElementById('edit-task-claimed-by').value || null;
 
             const updates = {
                 name: document.getElementById('edit-task-name').value,
                 description: document.getElementById('edit-task-description').value,
                 points: parseInt(document.getElementById('edit-task-points').value, 10),
-                dueDate: document.getElementById('edit-task-due-date').value
+                dueDate: document.getElementById('edit-task-due-date').value,
+                claimedBy: claimedBy,
+                status: claimedBy ? 'claimed' : 'available'
             };
+
+            // If setting to claimed, update claimedAt
+            if (claimedBy) {
+                updates.claimedAt = firebase.firestore.FieldValue.serverTimestamp();
+            } else {
+                updates.claimedAt = null;
+            }
 
             try {
                 await Tasks.update(taskId, updates);
@@ -385,6 +395,31 @@ const App = {
 
         try {
             const result = await Tasks.claim(taskId, this.currentMemberId);
+            if (result.success) {
+                showToast('Task claimed!', 'success');
+                await this.refreshData();
+            } else {
+                showToast(result.error, 'error');
+            }
+        } catch (e) {
+            console.error('Error claiming task:', e);
+            showToast('Error claiming task', 'error');
+        }
+    },
+
+    // Claim a task from another member (competitive claiming)
+    async claimFromTask(taskId, fromMemberId, fromMemberName) {
+        if (!this.currentMemberId) {
+            showToast('Select yourself first', 'error');
+            return;
+        }
+
+        if (!confirm(`Claim this task from ${fromMemberName}?`)) {
+            return;
+        }
+
+        try {
+            const result = await Tasks.claim(taskId, this.currentMemberId, fromMemberId);
             if (result.success) {
                 showToast('Task claimed!', 'success');
                 await this.refreshData();
@@ -448,6 +483,19 @@ const App = {
 
             const dueDate = task.dueDate.toDate();
             document.getElementById('edit-task-due-date').value = dueDate.toISOString().split('T')[0];
+
+            // Populate claimed by dropdown
+            const claimedBySelect = document.getElementById('edit-task-claimed-by');
+            claimedBySelect.innerHTML = '<option value="">Unclaimed</option>';
+            this.members.forEach(member => {
+                const option = document.createElement('option');
+                option.value = member.id;
+                option.textContent = member.name;
+                if (task.claimedBy === member.id) {
+                    option.selected = true;
+                }
+                claimedBySelect.appendChild(option);
+            });
 
             document.getElementById('edit-task-modal').classList.remove('hidden');
         } catch (e) {

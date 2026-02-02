@@ -429,6 +429,11 @@ h3 {
     font-style: italic;
 }
 
+.task-claimed-by.task-can-claim {
+    color: var(--success);
+    font-style: normal;
+}
+
 .task-actions {
     display: flex;
     gap: 8px;
