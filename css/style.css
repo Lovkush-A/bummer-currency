@@ -397,6 +397,34 @@ h3 {
     font-weight: 500;
 }
 
+/* Task Sections */
+.task-section {
+    margin-bottom: 20px;
+}
+
+.task-section:last-child {
+    margin-bottom: 0;
+}
+
+.task-section-header {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--gray-500);
+    margin-bottom: 8px;
+    padding-left: 4px;
+}
+
+.task-section-overdue .task-section-header {
+    color: var(--danger);
+}
+
+.task-item.overdue {
+    border-left-color: var(--danger);
+    background: #fef2f2;
+}
+
 .task-claimed-by {
     font-style: italic;
 }

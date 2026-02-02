@@ -1,16 +1,11 @@
 // Tasks module - handles task CRUD and claiming/completing
 
 const Tasks = {
-    // Fetch upcoming tasks (next 14 days) for a group
+    // Fetch upcoming tasks (available and claimed) for a group
     async getUpcoming(groupId) {
-        const now = new Date();
-        const twoWeeksFromNow = new Date();
-        twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
-
         const snapshot = await db.collection('tasks')
             .where('groupId', '==', groupId)
             .where('status', 'in', ['available', 'claimed'])
-            .where('dueDate', '<=', firebase.firestore.Timestamp.fromDate(twoWeeksFromNow))
             .orderBy('dueDate', 'asc')
             .get();
 
@@ -199,7 +194,94 @@ const Tasks = {
         await db.collection('tasks').add(newTask);
     },
 
-    // Render tasks list
+    // Group tasks by due date category
+    groupTasksByDueDate(tasks) {
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const dayAfterTomorrow = new Date(today);
+        dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
+        const nextWeek = new Date(today);
+        nextWeek.setDate(nextWeek.getDate() + 7);
+
+        const groups = {
+            overdue: [],
+            today: [],
+            tomorrow: [],
+            thisWeek: [],
+            later: [],
+            noDueDate: []
+        };
+
+        tasks.forEach(task => {
+            if (!task.dueDate) {
+                groups.noDueDate.push(task);
+                return;
+            }
+
+            const dueDate = task.dueDate.toDate();
+            const dueDateStart = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+
+            if (dueDateStart < today) {
+                groups.overdue.push(task);
+            } else if (dueDateStart.getTime() === today.getTime()) {
+                groups.today.push(task);
+            } else if (dueDateStart.getTime() === tomorrow.getTime()) {
+                groups.tomorrow.push(task);
+            } else if (dueDateStart < nextWeek) {
+                groups.thisWeek.push(task);
+            } else {
+                groups.later.push(task);
+            }
+        });
+
+        return groups;
+    },
+
+    // Render a single task item
+    renderTaskItem(task, memberMap, currentMemberId, isOverdue) {
+        const dueDate = task.dueDate ? task.dueDate.toDate() : null;
+        const dueDateStr = dueDate ? this.formatDate(dueDate) : 'No due date';
+
+        let statusClass = isOverdue ? 'overdue' : '';
+        let actions = '';
+        let claimedInfo = '';
+
+        if (task.status === 'available') {
+            if (currentMemberId) {
+                actions = `<button class="btn btn-primary btn-small" onclick="App.claimTask('${task.id}')">Claim</button>`;
+            }
+        } else if (task.status === 'claimed') {
+            statusClass += (statusClass ? ' ' : '') + 'claimed';
+            const claimerName = memberMap[task.claimedBy] || 'Unknown';
+            claimedInfo = `<span class="task-claimed-by">Claimed by ${this.escapeHtml(claimerName)}</span>`;
+
+            if (task.claimedBy === currentMemberId) {
+                actions = `<button class="btn btn-primary btn-small" onclick="App.completeTask('${task.id}')">Complete</button>`;
+            }
+        }
+
+        return `
+            <div class="task-item ${statusClass}">
+                <div class="task-header">
+                    <span class="task-name">${this.escapeHtml(task.name)}</span>
+                    <span class="task-points">${task.points} pts</span>
+                </div>
+                ${task.description ? `<div class="task-description">${this.escapeHtml(task.description)}</div>` : ''}
+                <div class="task-meta">
+                    <span class="task-due ${isOverdue ? 'overdue' : ''}">
+                        ${isOverdue ? 'Overdue: ' : 'Due: '}${dueDateStr}
+                        ${task.isRecurring ? ` (${task.frequency})` : ''}
+                    </span>
+                    ${claimedInfo}
+                </div>
+                ${actions ? `<div class="task-actions">${actions}</div>` : ''}
+            </div>
+        `;
+    },
+
+    // Render tasks list grouped by due date
     async renderTasksList(tasks, containerId, currentMemberId, members) {
         const container = document.getElementById(containerId);
 
@@ -212,48 +294,34 @@ const Tasks = {
         const memberMap = {};
         members.forEach(m => memberMap[m.id] = m.name);
 
-        container.innerHTML = tasks.map(task => {
-            const dueDate = task.dueDate.toDate();
-            const isOverdue = dueDate < new Date() && task.status !== 'completed';
-            const dueDateStr = this.formatDate(dueDate);
+        // Group tasks by due date
+        const groups = this.groupTasksByDueDate(tasks);
 
-            let statusClass = '';
-            let actions = '';
-            let claimedInfo = '';
+        const sections = [
+            { key: 'overdue', label: 'Overdue', isOverdue: true },
+            { key: 'today', label: 'Due Today', isOverdue: false },
+            { key: 'tomorrow', label: 'Due Tomorrow', isOverdue: false },
+            { key: 'thisWeek', label: 'Due This Week', isOverdue: false },
+            { key: 'later', label: 'Due Later', isOverdue: false },
+            { key: 'noDueDate', label: 'No Due Date', isOverdue: false }
+        ];
 
-            if (task.status === 'available') {
-                statusClass = '';
-                if (currentMemberId) {
-                    actions = `<button class="btn btn-primary btn-small" onclick="App.claimTask('${task.id}')">Claim</button>`;
-                }
-            } else if (task.status === 'claimed') {
-                statusClass = 'claimed';
-                const claimerName = memberMap[task.claimedBy] || 'Unknown';
-                claimedInfo = `<span class="task-claimed-by">Claimed by ${this.escapeHtml(claimerName)}</span>`;
+        let html = '';
 
-                if (task.claimedBy === currentMemberId) {
-                    actions = `<button class="btn btn-primary btn-small" onclick="App.completeTask('${task.id}')">Complete</button>`;
-                }
-            }
+        sections.forEach(section => {
+            const sectionTasks = groups[section.key];
+            if (sectionTasks.length === 0) return;
 
-            return `
-                <div class="task-item ${statusClass}">
-                    <div class="task-header">
-                        <span class="task-name">${this.escapeHtml(task.name)}</span>
-                        <span class="task-points">${task.points} pts</span>
-                    </div>
-                    ${task.description ? `<div class="task-description">${this.escapeHtml(task.description)}</div>` : ''}
-                    <div class="task-meta">
-                        <span class="task-due ${isOverdue ? 'overdue' : ''}">
-                            ${isOverdue ? 'Overdue: ' : 'Due: '}${dueDateStr}
-                            ${task.isRecurring ? ` (${task.frequency})` : ''}
-                        </span>
-                        ${claimedInfo}
-                    </div>
-                    ${actions ? `<div class="task-actions">${actions}</div>` : ''}
-                </div>
-            `;
-        }).join('');
+            const sectionClass = section.isOverdue ? 'task-section task-section-overdue' : 'task-section';
+            html += `<div class="${sectionClass}">`;
+            html += `<div class="task-section-header">${section.label}</div>`;
+            html += sectionTasks.map(task =>
+                this.renderTaskItem(task, memberMap, currentMemberId, section.isOverdue)
+            ).join('');
+            html += '</div>';
+        });
+
+        container.innerHTML = html;
     },
 
     // Render admin tasks list

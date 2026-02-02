@@ -192,7 +192,7 @@ const App = {
 
         // Leave button
         document.getElementById('leave-btn').addEventListener('click', () => {
-            if (confirm('Leave this group?')) {
+            if (confirm('Log out of this group?')) {
                 localStorage.removeItem('bummer_group_id');
                 localStorage.removeItem('bummer_member_id');
                 sessionStorage.removeItem('bummer_admin_verified');
