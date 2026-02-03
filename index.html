@@ -99,13 +99,13 @@
             <div class="container">
                 <!-- Admin Tabs -->
                 <div class="tabs">
-                    <button class="tab active" data-tab="members-tab">Members</button>
-                    <button class="tab" data-tab="tasks-tab">Tasks</button>
+                    <button class="tab active" data-tab="tasks-tab">Tasks</button>
+                    <button class="tab" data-tab="members-tab">Members</button>
                     <button class="tab" data-tab="group-tab">Group</button>
                 </div>
 
                 <!-- Members Tab -->
-                <div id="members-tab" class="tab-content active">
+                <div id="members-tab" class="tab-content">
                     <div class="card">
                         <h3>Add Member</h3>
                         <form id="add-member-form">
@@ -146,7 +146,7 @@
                 </div>
 
                 <!-- Tasks Tab -->
-                <div id="tasks-tab" class="tab-content">
+                <div id="tasks-tab" class="tab-content active">
                     <div class="card">
                         <h3>Create Task</h3>
                         <form id="create-task-form">
@@ -258,6 +258,23 @@
                         <div class="form-group">
                             <label for="edit-task-due-date">Due Date</label>
                             <input type="date" id="edit-task-due-date" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="edit-task-recurring">
+                            Recurring task
+                        </label>
+                    </div>
+                    <div class="form-group" id="edit-frequency-group" style="display: none;">
+                        <label>Repeat every</label>
+                        <div class="form-row">
+                            <input type="number" id="edit-task-frequency-interval" min="1" value="1" style="width: 80px;">
+                            <select id="edit-task-frequency-unit">
+                                <option value="days">day(s)</option>
+                                <option value="weeks">week(s)</option>
+                                <option value="months">month(s)</option>
+                            </select>
                         </div>
                     </div>
                     <div class="form-group">

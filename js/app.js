@@ -335,16 +335,24 @@ const App = {
             document.getElementById('edit-task-modal').classList.add('hidden');
         });
 
+        document.getElementById('edit-task-recurring').addEventListener('change', (e) => {
+            document.getElementById('edit-frequency-group').style.display = e.target.checked ? 'block' : 'none';
+        });
+
         document.getElementById('edit-task-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const taskId = document.getElementById('edit-task-id').value;
             const claimedBy = document.getElementById('edit-task-claimed-by').value || null;
+            const isRecurring = document.getElementById('edit-task-recurring').checked;
 
             const updates = {
                 name: document.getElementById('edit-task-name').value,
                 description: document.getElementById('edit-task-description').value,
                 points: parseInt(document.getElementById('edit-task-points').value, 10),
                 dueDate: document.getElementById('edit-task-due-date').value,
+                isRecurring: isRecurring,
+                frequencyInterval: isRecurring ? parseInt(document.getElementById('edit-task-frequency-interval').value, 10) : null,
+                frequencyUnit: isRecurring ? document.getElementById('edit-task-frequency-unit').value : null,
                 claimedBy: claimedBy,
                 status: claimedBy ? 'claimed' : 'available'
             };
@@ -484,6 +492,12 @@ const App = {
 
             const dueDate = task.dueDate.toDate();
             document.getElementById('edit-task-due-date').value = dueDate.toISOString().split('T')[0];
+
+            // Populate recurring fields
+            document.getElementById('edit-task-recurring').checked = task.isRecurring || false;
+            document.getElementById('edit-frequency-group').style.display = task.isRecurring ? 'block' : 'none';
+            document.getElementById('edit-task-frequency-interval').value = task.frequencyInterval || 1;
+            document.getElementById('edit-task-frequency-unit').value = task.frequencyUnit || 'days';
 
             // Populate claimed by dropdown
             const claimedBySelect = document.getElementById('edit-task-claimed-by');

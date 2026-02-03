@@ -151,7 +151,7 @@ const Tasks = {
         });
 
         // If recurring, create next instance
-        if (task.isRecurring && (task.frequencyInterval || task.frequency)) {
+        if (task.isRecurring && task.frequencyInterval) {
             await this.createNextRecurrence(task);
         }
 
@@ -163,36 +163,17 @@ const Tasks = {
         const currentDue = task.dueDate.toDate();
         let nextDue = new Date(currentDue);
 
-        // Handle new format (frequencyInterval + frequencyUnit)
-        if (task.frequencyInterval && task.frequencyUnit) {
-            const interval = task.frequencyInterval;
-            switch (task.frequencyUnit) {
-                case 'days':
-                    nextDue.setDate(nextDue.getDate() + interval);
-                    break;
-                case 'weeks':
-                    nextDue.setDate(nextDue.getDate() + (interval * 7));
-                    break;
-                case 'months':
-                    nextDue.setMonth(nextDue.getMonth() + interval);
-                    break;
-            }
-        } else {
-            // Legacy format support
-            switch (task.frequency) {
-                case 'daily':
-                    nextDue.setDate(nextDue.getDate() + 1);
-                    break;
-                case 'weekly':
-                    nextDue.setDate(nextDue.getDate() + 7);
-                    break;
-                case 'biweekly':
-                    nextDue.setDate(nextDue.getDate() + 14);
-                    break;
-                case 'monthly':
-                    nextDue.setMonth(nextDue.getMonth() + 1);
-                    break;
-            }
+        const interval = task.frequencyInterval;
+        switch (task.frequencyUnit) {
+            case 'days':
+                nextDue.setDate(nextDue.getDate() + interval);
+                break;
+            case 'weeks':
+                nextDue.setDate(nextDue.getDate() + (interval * 7));
+                break;
+            case 'months':
+                nextDue.setMonth(nextDue.getMonth() + interval);
+                break;
         }
 
         const newTask = {
@@ -201,9 +182,8 @@ const Tasks = {
             description: task.description,
             points: task.points,
             isRecurring: true,
-            frequencyInterval: task.frequencyInterval || null,
-            frequencyUnit: task.frequencyUnit || null,
-            frequency: task.frequency || null, // Keep for legacy
+            frequencyInterval: task.frequencyInterval,
+            frequencyUnit: task.frequencyUnit,
             dueDate: firebase.firestore.Timestamp.fromDate(nextDue),
             status: 'available',
             claimedBy: null,
@@ -394,18 +374,15 @@ const Tasks = {
 
     // Format frequency for display
     formatFrequency(task) {
-        if (task.frequencyInterval && task.frequencyUnit) {
-            const interval = task.frequencyInterval;
-            const unit = task.frequencyUnit;
-            if (interval === 1) {
-                // Singular: "every day", "every week", "every month"
-                const singular = unit.slice(0, -1); // Remove 's'
-                return `every ${singular}`;
-            }
-            return `every ${interval} ${unit}`;
+        if (!task.frequencyInterval || !task.frequencyUnit) return '';
+        const interval = task.frequencyInterval;
+        const unit = task.frequencyUnit;
+        if (interval === 1) {
+            // Singular: "every day", "every week", "every month"
+            const singular = unit.slice(0, -1); // Remove 's'
+            return `every ${singular}`;
         }
-        // Legacy format
-        return task.frequency || '';
+        return `every ${interval} ${unit}`;
     },
 
     // Format date for display
