@@ -292,7 +292,8 @@ const App = {
                 points: document.getElementById('task-points').value,
                 dueDate: document.getElementById('task-due-date').value,
                 isRecurring: document.getElementById('task-recurring').checked,
-                frequency: document.getElementById('task-frequency').value
+                frequencyInterval: document.getElementById('task-frequency-interval').value,
+                frequencyUnit: document.getElementById('task-frequency-unit').value
             };
 
             try {
