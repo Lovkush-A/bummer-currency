@@ -79,6 +79,26 @@
                     </div>
                 </div>
 
+                <!-- Log a Task -->
+                <details class="card log-task-card">
+                    <summary><h2>Log a Task</h2></summary>
+                    <form id="log-task-form">
+                        <div class="form-group">
+                            <label for="log-task-name">Task Name</label>
+                            <input type="text" id="log-task-name" placeholder="What did you do?" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="log-task-description">Description (optional)</label>
+                            <textarea id="log-task-description" rows="2"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="log-task-points">Points</label>
+                            <input type="number" id="log-task-points" min="1" value="10" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Claim & Log</button>
+                    </form>
+                </details>
+
                 <!-- History -->
                 <details class="card history-card">
                     <summary><h2>Recent Activity</h2></summary>
@@ -288,6 +308,21 @@
                         <button type="submit" class="btn btn-primary">Save</button>
                     </div>
                 </form>
+            </div>
+        </div>
+        <!-- Next Occurrence Modal -->
+        <div id="next-occurrence-modal" class="modal hidden">
+            <div class="modal-content">
+                <h2 id="next-occurrence-title">Next Occurrence</h2>
+                <p>Set the date for the next occurrence:</p>
+                <div class="form-group">
+                    <label for="next-occurrence-date">Next due date</label>
+                    <input type="date" id="next-occurrence-date" required>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="next-occurrence-cancel" class="btn btn-secondary">Cancel</button>
+                    <button type="button" id="next-occurrence-confirm" class="btn btn-primary">Confirm</button>
+                </div>
             </div>
         </div>
     </div>

@@ -36,7 +36,8 @@ const Tasks = {
     },
 
     // Create a new task
-    async create(groupId, taskData) {
+    // createdByMember: { id, name } for user-logged tasks, null for admin-created tasks
+    async create(groupId, taskData, createdByMember = null) {
         const task = {
             groupId,
             name: taskData.name.trim(),
@@ -45,12 +46,13 @@ const Tasks = {
             isRecurring: taskData.isRecurring || false,
             frequencyInterval: taskData.isRecurring ? parseInt(taskData.frequencyInterval, 10) : null,
             frequencyUnit: taskData.isRecurring ? taskData.frequencyUnit : null,
-            dueDate: firebase.firestore.Timestamp.fromDate(new Date(taskData.dueDate)),
-            status: 'available',
-            claimedBy: null,
-            claimedAt: null,
+            dueDate: taskData.dueDate ? firebase.firestore.Timestamp.fromDate(new Date(taskData.dueDate)) : null,
+            status: createdByMember ? 'claimed' : 'available',
+            claimedBy: createdByMember ? createdByMember.id : null,
+            claimedAt: createdByMember ? firebase.firestore.FieldValue.serverTimestamp() : null,
             completedBy: null,
             completedAt: null,
+            createdByMember: createdByMember ? createdByMember.id : null,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         };
 
@@ -60,7 +62,7 @@ const Tasks = {
         await History.log(groupId, {
             action: 'task_created',
             taskName: task.name,
-            memberName: 'Admin',
+            memberName: createdByMember ? createdByMember.name : 'Admin',
             points: task.points
         });
 
@@ -117,7 +119,7 @@ const Tasks = {
     },
 
     // Complete a task
-    async complete(taskId, memberId) {
+    async complete(taskId, memberId, nextDueDate = null) {
         const task = await this.get(taskId);
         if (!task) {
             return { success: false, error: 'Task not found' };
@@ -152,28 +154,32 @@ const Tasks = {
 
         // If recurring, create next instance
         if (task.isRecurring && task.frequencyInterval) {
-            await this.createNextRecurrence(task);
+            await this.createNextRecurrence(task, nextDueDate);
         }
 
         return { success: true, points: task.points };
     },
 
     // Create next recurrence of a recurring task
-    async createNextRecurrence(task) {
-        const currentDue = task.dueDate.toDate();
-        let nextDue = new Date(currentDue);
-
-        const interval = task.frequencyInterval;
-        switch (task.frequencyUnit) {
-            case 'days':
-                nextDue.setDate(nextDue.getDate() + interval);
-                break;
-            case 'weeks':
-                nextDue.setDate(nextDue.getDate() + (interval * 7));
-                break;
-            case 'months':
-                nextDue.setMonth(nextDue.getMonth() + interval);
-                break;
+    async createNextRecurrence(task, overrideDate = null) {
+        let nextDue;
+        if (overrideDate) {
+            nextDue = overrideDate instanceof Date ? overrideDate : new Date(overrideDate);
+        } else {
+            const currentDue = task.dueDate.toDate();
+            nextDue = new Date(currentDue);
+            const interval = task.frequencyInterval;
+            switch (task.frequencyUnit) {
+                case 'days':
+                    nextDue.setDate(nextDue.getDate() + interval);
+                    break;
+                case 'weeks':
+                    nextDue.setDate(nextDue.getDate() + (interval * 7));
+                    break;
+                case 'months':
+                    nextDue.setMonth(nextDue.getMonth() + interval);
+                    break;
+            }
         }
 
         const newTask = {
@@ -190,10 +196,45 @@ const Tasks = {
             claimedAt: null,
             completedBy: null,
             completedAt: null,
+            createdByMember: null,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         };
 
         await db.collection('tasks').add(newTask);
+    },
+
+    // Skip a recurring task occurrence and create the next one
+    async skip(taskId, memberId, nextDueDate = null) {
+        const task = await this.get(taskId);
+        if (!task) {
+            return { success: false, error: 'Task not found' };
+        }
+
+        if (task.status === 'completed' || task.status === 'skipped') {
+            return { success: false, error: 'Task is no longer active' };
+        }
+
+        const member = await Members.get(memberId);
+        if (!member) {
+            return { success: false, error: 'Member not found' };
+        }
+
+        await db.collection('tasks').doc(taskId).update({
+            status: 'skipped',
+            skippedBy: memberId,
+            skippedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        await History.log(task.groupId, {
+            action: 'task_skipped',
+            taskName: task.name,
+            memberName: member.name,
+            points: 0
+        });
+
+        await this.createNextRecurrence(task, nextDueDate);
+
+        return { success: true };
     },
 
     // Group tasks by due date category
@@ -252,9 +293,13 @@ const Tasks = {
 
         const currentMemberPoints = currentMemberId ? (memberPointsMap[currentMemberId] || 0) : 0;
 
+        const skipBtn = currentMemberId && task.isRecurring
+            ? ` <button class="btn btn-secondary btn-small" onclick="App.initiateSkip('${task.id}')">Skip</button>`
+            : '';
+
         if (task.status === 'available') {
             if (currentMemberId) {
-                actions = `<button class="btn btn-primary btn-small" onclick="App.claimTask('${task.id}')">Claim</button>`;
+                actions = `<button class="btn btn-primary btn-small" onclick="App.claimTask('${task.id}')">Claim</button>${skipBtn}`;
             }
         } else if (task.status === 'claimed') {
             statusClass += (statusClass ? ' ' : '') + 'claimed';
@@ -264,21 +309,22 @@ const Tasks = {
             if (task.claimedBy === currentMemberId) {
                 // You claimed it - show Complete button
                 claimedInfo = `<span class="task-claimed-by">Claimed by you</span>`;
-                actions = `<button class="btn btn-primary btn-small" onclick="App.completeTask('${task.id}')">Complete</button>`;
+                actions = `<button class="btn btn-primary btn-small" onclick="App.initiateComplete('${task.id}')">Complete</button>${skipBtn}`;
             } else if (currentMemberId && currentMemberPoints < claimerPoints) {
                 // You have fewer points - can claim from them
                 claimedInfo = `<span class="task-claimed-by task-can-claim">You have fewer points than ${this.escapeHtml(claimerName)}</span>`;
-                actions = `<button class="btn btn-secondary btn-small" onclick="App.claimFromTask('${task.id}', '${task.claimedBy}', '${this.escapeHtml(claimerName).replace(/'/g, "\\'")}')">Claim from ${this.escapeHtml(claimerName)}</button>`;
+                actions = `<button class="btn btn-secondary btn-small" onclick="App.claimFromTask('${task.id}', '${task.claimedBy}', '${this.escapeHtml(claimerName).replace(/'/g, "\\'")}')">Claim from ${this.escapeHtml(claimerName)}</button>${skipBtn}`;
             } else {
                 // They have fewer or equal points - cannot claim
                 claimedInfo = `<span class="task-claimed-by">Claimed by ${this.escapeHtml(claimerName)} (fewer points)</span>`;
+                actions = skipBtn.trim();
             }
         }
 
         return `
             <div class="task-item ${statusClass}">
                 <div class="task-header">
-                    <span class="task-name">${this.escapeHtml(task.name)}</span>
+                    <span class="task-name">${this.escapeHtml(task.name)}${task.createdByMember ? ' <span class="task-badge">self-logged</span>' : ''}</span>
                     <span class="task-points">${task.points} pts</span>
                 </div>
                 ${task.description ? `<div class="task-description">${this.escapeHtml(task.description)}</div>` : ''}
@@ -351,8 +397,8 @@ const Tasks = {
         }
 
         container.innerHTML = tasks.map(task => {
-            const dueDate = task.dueDate.toDate();
-            const dueDateStr = this.formatDate(dueDate);
+            const dueDate = task.dueDate ? task.dueDate.toDate() : null;
+            const dueDateStr = dueDate ? this.formatDate(dueDate) : 'No due date';
 
             return `
                 <div class="admin-list-item">

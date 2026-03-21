@@ -64,6 +64,9 @@ const History = {
                 case 'task_created':
                     actionText = `Task "${this.escapeHtml(item.taskName)}" created (${item.points} pts)`;
                     break;
+                case 'task_skipped':
+                    actionText = `${this.escapeHtml(item.memberName)} skipped "${this.escapeHtml(item.taskName)}"`;
+                    break;
                 default:
                     actionText = item.action;
             }

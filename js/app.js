@@ -6,6 +6,7 @@ const App = {
     currentMemberId: null,
     members: [],
     tasks: [],
+    pendingAction: null,
 
     // Initialize the app
     async init() {
@@ -330,6 +331,20 @@ const App = {
             });
         });
 
+        // Log task form
+        document.getElementById('log-task-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await this.logTask();
+        });
+
+        // Next occurrence modal
+        document.getElementById('next-occurrence-confirm').addEventListener('click', async () => {
+            await this.confirmNextOccurrence();
+        });
+        document.getElementById('next-occurrence-cancel').addEventListener('click', () => {
+            this.hideNextOccurrenceModal();
+        });
+
         // Edit task modal
         document.getElementById('edit-task-cancel').addEventListener('click', () => {
             document.getElementById('edit-task-modal').classList.add('hidden');
@@ -441,15 +456,140 @@ const App = {
         }
     },
 
-    // Complete a task
-    async completeTask(taskId) {
+    // Log a user-created task (claimed immediately by the current member)
+    async logTask() {
+        if (!this.currentMemberId) {
+            showToast('Select yourself first', 'error');
+            return;
+        }
+
+        const name = document.getElementById('log-task-name').value.trim();
+        const description = document.getElementById('log-task-description').value.trim();
+        const points = document.getElementById('log-task-points').value;
+
+        const member = this.members.find(m => m.id === this.currentMemberId);
+        if (!member) {
+            showToast('Member not found', 'error');
+            return;
+        }
+
+        try {
+            await Tasks.create(
+                this.currentGroupId,
+                { name, description, points, isRecurring: false },
+                { id: this.currentMemberId, name: member.name }
+            );
+            document.getElementById('log-task-form').reset();
+            showToast('Task logged!', 'success');
+            await this.refreshData();
+        } catch (e) {
+            console.error('Error logging task:', e);
+            showToast('Error logging task', 'error');
+        }
+    },
+
+    // Initiate task completion — shows date picker for recurring tasks
+    async initiateComplete(taskId) {
+        if (!this.currentMemberId) {
+            showToast('Select yourself first', 'error');
+            return;
+        }
+
+        const task = this.tasks.find(t => t.id === taskId);
+        if (task && task.isRecurring) {
+            const nextDate = this.calculateNextDate(task);
+            this.showNextOccurrenceModal(taskId, nextDate, 'complete');
+        } else {
+            await this.executeComplete(taskId);
+        }
+    },
+
+    // Initiate task skip — confirms, then shows date picker for recurring tasks
+    async initiateSkip(taskId) {
+        if (!this.currentMemberId) {
+            showToast('Select yourself first', 'error');
+            return;
+        }
+
+        const task = this.tasks.find(t => t.id === taskId);
+        const taskName = task ? task.name : 'this task';
+
+        if (!confirm(`Skip this occurrence of "${taskName}"? The next occurrence will be created.`)) {
+            return;
+        }
+
+        if (task && task.isRecurring) {
+            const nextDate = this.calculateNextDate(task);
+            this.showNextOccurrenceModal(taskId, nextDate, 'skip');
+        } else {
+            await this.executeSkip(taskId);
+        }
+    },
+
+    // Calculate the default next due date for a recurring task
+    calculateNextDate(task) {
+        const currentDue = task.dueDate.toDate();
+        const nextDue = new Date(currentDue);
+        const interval = task.frequencyInterval;
+        switch (task.frequencyUnit) {
+            case 'days': nextDue.setDate(nextDue.getDate() + interval); break;
+            case 'weeks': nextDue.setDate(nextDue.getDate() + (interval * 7)); break;
+            case 'months': nextDue.setMonth(nextDue.getMonth() + interval); break;
+        }
+        return nextDue;
+    },
+
+    // Show the next occurrence date modal
+    showNextOccurrenceModal(taskId, defaultDate, actionType) {
+        this.pendingAction = { taskId, actionType };
+        document.getElementById('next-occurrence-title').textContent =
+            actionType === 'complete' ? 'Complete Task' : 'Skip Task';
+        document.getElementById('next-occurrence-date').value =
+            defaultDate.toISOString().split('T')[0];
+        document.getElementById('next-occurrence-modal').classList.remove('hidden');
+    },
+
+    // Hide the next occurrence date modal
+    hideNextOccurrenceModal() {
+        document.getElementById('next-occurrence-modal').classList.add('hidden');
+        this.pendingAction = null;
+    },
+
+    // Confirm the next occurrence date and execute the pending action
+    async confirmNextOccurrence() {
+        const dateValue = document.getElementById('next-occurrence-date').value;
+        if (!dateValue) {
+            showToast('Please select a date', 'error');
+            return;
+        }
+
+        const nextDate = new Date(dateValue + 'T00:00:00');
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (nextDate < today) {
+            showToast('Date must be today or later', 'error');
+            return;
+        }
+
+        const { taskId, actionType } = this.pendingAction;
+        this.hideNextOccurrenceModal();
+
+        if (actionType === 'complete') {
+            await this.executeComplete(taskId, nextDate);
+        } else {
+            await this.executeSkip(taskId, nextDate);
+        }
+    },
+
+    // Execute task completion
+    async executeComplete(taskId, nextDate = null) {
         if (!this.currentMemberId) {
             showToast('Select yourself first', 'error');
             return;
         }
 
         try {
-            const result = await Tasks.complete(taskId, this.currentMemberId);
+            const result = await Tasks.complete(taskId, this.currentMemberId, nextDate);
             if (result.success) {
                 showToast(`Task completed! +${result.points} pts`, 'success');
                 await this.refreshData();
@@ -459,6 +599,27 @@ const App = {
         } catch (e) {
             console.error('Error completing task:', e);
             showToast('Error completing task', 'error');
+        }
+    },
+
+    // Execute task skip
+    async executeSkip(taskId, nextDate = null) {
+        if (!this.currentMemberId) {
+            showToast('Select yourself first', 'error');
+            return;
+        }
+
+        try {
+            const result = await Tasks.skip(taskId, this.currentMemberId, nextDate);
+            if (result.success) {
+                showToast('Task skipped', 'success');
+                await this.refreshData();
+            } else {
+                showToast(result.error, 'error');
+            }
+        } catch (e) {
+            console.error('Error skipping task:', e);
+            showToast('Error skipping task', 'error');
         }
     },
 
