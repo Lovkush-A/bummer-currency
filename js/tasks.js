@@ -15,10 +15,11 @@ const Tasks = {
         }));
     },
 
-    // Fetch all tasks for admin view
+    // Fetch active tasks for admin view
     async getAll(groupId) {
         const snapshot = await db.collection('tasks')
             .where('groupId', '==', groupId)
+            .where('status', 'in', ['available', 'claimed'])
             .orderBy('dueDate', 'asc')
             .get();
 
