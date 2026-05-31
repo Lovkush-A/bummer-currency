@@ -362,12 +362,12 @@ const Tasks = {
         const groups = this.groupTasksByDueDate(tasks);
 
         const sections = [
+            { key: 'noDueDate', label: 'No Due Date', isOverdue: false },
             { key: 'overdue', label: 'Overdue', isOverdue: true },
             { key: 'today', label: 'Due Today', isOverdue: false },
             { key: 'tomorrow', label: 'Due Tomorrow', isOverdue: false },
             { key: 'thisWeek', label: 'Due This Week', isOverdue: false },
-            { key: 'later', label: 'Due Later', isOverdue: false },
-            { key: 'noDueDate', label: 'No Due Date', isOverdue: false }
+            { key: 'later', label: 'Due Later', isOverdue: false }
         ];
 
         let html = '';

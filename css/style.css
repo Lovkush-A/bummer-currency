@@ -440,6 +440,29 @@ h3 {
     margin-top: 12px;
 }
 
+/* Log a Task */
+.log-task-card summary {
+    cursor: pointer;
+    list-style: none;
+}
+
+.log-task-card summary::-webkit-details-marker {
+    display: none;
+}
+
+.log-task-card summary h2 {
+    display: inline;
+}
+
+.log-task-card summary h2::after {
+    content: ' +';
+    color: var(--gray-400);
+}
+
+.log-task-card[open] summary h2::after {
+    content: ' -';
+}
+
 /* History */
 .history-card summary {
     cursor: pointer;
